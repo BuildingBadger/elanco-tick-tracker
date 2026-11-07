@@ -287,3 +287,7 @@ python manage.py check
 - Sightings are unverified community submissions. Tick identification and
   health guidance in the application are informational and are not a substitute
   for advice from a healthcare or veterinary professional.
+
+## Walkthrough video
+
+[Watch the project walkthrough on YouTube](https://www.youtube.com/watch?v=Jj06l1mnXds).
