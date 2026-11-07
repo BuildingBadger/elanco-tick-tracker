@@ -1,0 +1,1762 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UK Tick Tracker</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+    >
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+    >
+
+    <style>
+        :root {
+            color-scheme: light;
+            --page: #f4f7f8;
+            --surface: #ffffff;
+            --surface-muted: #eaf1f4;
+            --text: #173747;
+            --muted: #506975;
+            --border: #c9d7dd;
+            --brand: #075b78;
+            --brand-hover: #06465d;
+            --focus: #e39b00;
+            --shadow: 0 12px 32px rgb(15 48 62 / 9%);
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --page: #101a20;
+            --surface: #19272f;
+            --surface-muted: #22343e;
+            --text: #edf5f7;
+            --muted: #c1d0d6;
+            --border: #40545e;
+            --brand: #176f8d;
+            --brand-hover: #2284a4;
+            --focus: #ffd166;
+            --shadow: 0 12px 32px rgb(0 0 0 / 28%);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 20px;
+        }
+
+        body {
+            margin: 0;
+            background: var(--page);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            transition: background-color 180ms ease, color 180ms ease;
+        }
+
+        a {
+            color: var(--brand);
+        }
+
+        a:hover {
+            text-decoration-thickness: 2px;
+        }
+
+        :focus-visible {
+            outline: 3px solid var(--focus);
+            outline-offset: 3px;
+        }
+
+        .skip-link {
+            position: absolute;
+            z-index: 2000;
+            top: 8px;
+            left: 8px;
+            padding: 10px 14px;
+            transform: translateY(-150%);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        .skip-link:focus {
+            transform: translateY(0);
+        }
+
+        .site-header {
+            padding: 28px max(24px, calc((100% - 1180px) / 2));
+            background: linear-gradient(120deg, #073e56, #087b91);
+            color: #fff;
+        }
+
+        .header-content {
+            display: flex;
+            max-width: 1180px;
+            margin: 0 auto;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .site-navigation {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+        }
+
+        .site-navigation a {
+            color: #fff;
+            font-weight: 650;
+            text-underline-offset: 4px;
+        }
+
+        .site-header h1 {
+            margin: 0;
+            font-size: clamp(1.7rem, 3vw, 2.4rem);
+            line-height: 1.2;
+        }
+
+        .site-header p {
+            margin: 8px 0 0;
+            color: #e1f3f6;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+        }
+
+        button {
+            min-height: 44px;
+            padding: 9px 16px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            background: var(--brand);
+            color: #fff;
+            font-weight: 650;
+            cursor: pointer;
+            transition: background-color 150ms ease, transform 150ms ease;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--brand-hover);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: wait;
+            opacity: 0.7;
+        }
+
+        .theme-toggle {
+            flex: 0 0 auto;
+            border-color: rgb(255 255 255 / 55%);
+            background: rgb(0 0 0 / 18%);
+        }
+
+        .theme-toggle:hover:not(:disabled) {
+            background: rgb(0 0 0 / 32%);
+        }
+
+        main {
+            width: min(1180px, calc(100% - 40px));
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            margin: 24px 0 12px;
+            padding: 16px;
+            align-items: end;
+            flex-wrap: wrap;
+            gap: 12px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+
+        .filter-field {
+            display: grid;
+            min-width: 145px;
+            flex: 1 1 145px;
+            gap: 5px;
+            color: var(--muted);
+            font-size: 0.88rem;
+            font-weight: 650;
+        }
+
+        .filter-field input,
+        .filter-field select,
+        .report-panel input,
+        .report-panel select,
+        .report-panel textarea {
+            width: 100%;
+            min-height: 44px;
+            padding: 9px 11px;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        .filter-field select {
+            height: 44px;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+
+        #status,
+        #reportStatus,
+        #insightsStatus {
+            min-height: 28px;
+            margin: 8px 0;
+            color: var(--muted);
+        }
+
+        .map-frame {
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--surface-muted);
+            box-shadow: var(--shadow);
+        }
+
+        #map {
+            height: min(68vh, 680px);
+            min-height: 390px;
+            scroll-margin-top: 12px;
+        }
+
+        :root[data-theme="dark"] #map .leaflet-tile {
+            filter: invert(0.88) hue-rotate(180deg) brightness(0.82) contrast(0.88);
+        }
+
+        :root[data-theme="dark"] input[type="date"],
+        :root[data-theme="dark"] input[type="datetime-local"] {
+            color: #ff8585;
+            color-scheme: dark;
+        }
+
+        .leaflet-popup-content-wrapper,
+        .leaflet-popup-tip,
+        .leaflet-control-zoom a {
+            background: var(--surface);
+            color: var(--text);
+        }
+
+        .leaflet-control-attribution {
+            color: #17232a;
+        }
+
+        .leaflet-control-sighting-count {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            box-shadow: var(--shadow);
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 650;
+        }
+
+        .map-legend {
+            display: flex;
+            margin: 0;
+            padding: 12px 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px 22px;
+            background: var(--surface);
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+        }
+
+        .legend-marker {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            outline: 2px solid #17232a;
+            background: #f5a623;
+        }
+
+        .legend-marker.recent {
+            border-radius: 50%;
+            background: #f5a623;
+        }
+
+        .legend-marker.older {
+            transform: rotate(45deg) scale(0.82);
+            background: #a64ac9;
+        }
+
+        .sighting-marker-icon {
+            border: 0;
+            background: transparent;
+        }
+
+        .sighting-pin {
+            display: block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #fff;
+            outline: 2px solid #17232a;
+            box-shadow: 0 1px 5px rgb(0 0 0 / 45%);
+        }
+
+        .sighting-pin.recent {
+            border-radius: 50%;
+            background: #f5a623;
+        }
+
+        .sighting-pin.older {
+            transform: rotate(45deg) scale(0.82);
+            background: #a64ac9;
+        }
+
+        .content-panel {
+            margin: 28px 0;
+            padding: clamp(20px, 3vw, 32px);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+
+        h2,
+        h3 {
+            line-height: 1.3;
+        }
+
+        .content-panel h2 {
+            margin-top: 0;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.8fr) minmax(220px, 1fr);
+            align-items: start;
+            gap: 28px;
+        }
+
+        .species-month-breakdown {
+            display: grid;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .species-month-card {
+            min-width: 0;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface);
+        }
+
+        .species-month-card h4 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        .species-month-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 5px;
+        }
+
+        .species-month-cell {
+            display: grid;
+            min-width: 0;
+            justify-items: center;
+            gap: 4px;
+            padding: 6px 2px;
+            border-radius: 6px;
+            background: var(--surface-muted);
+            font-size: 0.72rem;
+            line-height: 1.2;
+        }
+
+        .species-month-cell span:first-child {
+            color: var(--muted);
+        }
+
+        .species-month-total {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.9rem;
+            text-align: right;
+        }
+
+        .table-wrapper {
+            max-width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .data-table th {
+            background: var(--surface-muted);
+        }
+
+        .sightings-list {
+            margin-top: 20px;
+        }
+
+        .sightings-list summary {
+            padding: 12px 14px;
+            background: var(--surface-muted);
+            color: var(--text);
+            font-weight: 650;
+            cursor: pointer;
+        }
+
+        .sightings-list .table-wrapper {
+            max-height: 480px;
+            overflow: auto;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .sightings-list thead {
+            position: sticky;
+            z-index: 1;
+            top: 0;
+        }
+
+        #sightingTableBody tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .chart {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            align-items: end;
+            gap: clamp(3px, 1vw, 8px);
+            min-width: 0;
+            min-height: 220px;
+            padding: 16px 0 0;
+        }
+
+        .chart-column {
+            display: flex;
+            min-width: 0;
+            height: 200px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .chart-bar {
+            width: min(100%, 38px);
+            min-height: 2px;
+            border-radius: 4px 4px 0 0;
+            background: #0a7896;
+        }
+
+        :root[data-theme="dark"] .chart-bar {
+            background: #61c5d8;
+        }
+
+        .region-dropdown {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+        }
+
+        .region-dropdown summary {
+            padding: 10px 12px;
+            color: var(--text);
+            font-weight: 650;
+            cursor: pointer;
+        }
+
+        #regionList {
+            max-height: 260px;
+            margin: 0;
+            overflow-y: auto;
+            padding: 0 12px 10px 34px;
+            line-height: 1.9;
+        }
+
+        #regionList:empty {
+            display: none;
+        }
+
+        .region-dropdown[open] {
+            box-shadow: var(--shadow);
+        }
+
+        #regionList button {
+            padding: 2px 4px;
+            border: 0;
+            border-radius: 4px;
+            background: transparent;
+            color: var(--brand);
+            font: inherit;
+            text-align: left;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            cursor: pointer;
+        }
+
+        #regionList button:hover {
+            background: var(--surface-muted);
+        }
+
+        .education-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 24px;
+        }
+
+        .education-grid h3 {
+            margin: 0 0 8px;
+        }
+
+        .tick-guide {
+            margin-top: 24px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface-muted);
+        }
+
+        .tick-guide summary {
+            padding: 14px 16px;
+            color: var(--text);
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .tick-guide-content {
+            overflow-x: auto;
+            padding: 0 16px 16px;
+        }
+
+        .tick-guide table {
+            width: 100%;
+            min-width: 760px;
+            table-layout: fixed;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .tick-guide th:first-child {
+            width: 150px;
+        }
+
+        .tick-guide td:nth-child(2) {
+            width: 320px;
+        }
+
+        .tick-guide th,
+        .tick-guide td {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .tick-guide figure {
+            margin: 0;
+        }
+
+        .tick-guide img {
+            display: block;
+            width: 100%;
+            height: 190px;
+            object-fit: contain;
+            background: #fff;
+        }
+
+        .tick-guide figcaption {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .report-panel {
+            max-width: 760px;
+            margin-right: auto;
+            margin-left: auto;
+        }
+
+        .report-panel label {
+            display: block;
+            margin: 16px 0;
+            color: var(--muted);
+            font-weight: 650;
+        }
+
+        .report-panel input,
+        .report-panel select,
+        .report-panel textarea {
+            display: block;
+            margin-top: 5px;
+            font-weight: 400;
+        }
+
+        .report-panel input[hidden] {
+            display: none;
+        }
+
+        .report-panel select {
+            height: 44px;
+            font: inherit;
+        }
+
+        .report-panel textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .coordinate-help {
+            margin: 8px 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            clip-path: inset(50%);
+        }
+
+        @media (max-width: 700px) {
+            .site-header {
+                padding: 22px 20px;
+            }
+
+            .header-content {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .theme-toggle {
+                padding: 8px 10px;
+                font-size: 0.9rem;
+            }
+
+            main {
+                width: min(100% - 24px, 1180px);
+            }
+
+            .controls {
+                gap: 10px;
+            }
+
+            #map {
+                min-height: 350px;
+            }
+
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart {
+                gap: 3px;
+            }
+
+            .content-panel {
+                margin: 18px 0;
+                padding: 18px;
+            }
+
+            .insights-grid {
+                gap: 20px;
+            }
+
+            .species-month-card {
+                padding: 10px;
+            }
+
+            .species-month-grid {
+                gap: 3px;
+            }
+
+            .species-month-cell {
+                font-size: 0.65rem;
+            }
+
+            .chart-column {
+                font-size: 10px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <header class="site-header">
+        <div class="header-content">
+            <div>
+                <h1>UK Tick Tracker</h1>
+                <p>Explore and report tick sightings across the UK</p>
+            </div>
+            <nav class="site-navigation" aria-label="Page sections">
+                <a href="#map">Map</a>
+                <a href="#insightsSection">Insights</a>
+                <a href="#sightingsSection">Sightings list</a>
+                <a href="#reportSection">Report a sighting</a>
+                <a href="#tickGuide">Tick guide</a>
+            </nav>
+            <button id="themeToggle" class="theme-toggle" type="button"
+                    aria-label="Switch to dark theme" aria-pressed="false">
+                Dark theme
+            </button>
+        </div>
+    </header>
+
+    <main id="mainContent">
+        <section id="filters" class="controls" aria-label="Filter sightings">
+            <label class="filter-field" for="locationFilter">
+                Location
+                <input id="locationFilter" type="text" placeholder="e.g. London">
+            </label>
+            <label class="filter-field" for="speciesFilter">
+                Species
+                <select id="speciesFilter">
+                    <option value="">All species</option>
+                    {% for species in species_options %}
+                    <option value="{{ species.value }}">{{ species.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="filter-field" for="fromFilter">
+                From
+                <input id="fromFilter" type="date">
+            </label>
+            <label class="filter-field" for="toFilter">
+                To
+                <input id="toFilter" type="date">
+            </label>
+            <button id="filterButton" type="button">Apply filters</button>
+            <button id="resetButton" type="button">Reset</button>
+        </section>
+
+        <div id="status" role="status" aria-live="polite">Loading sightings...</div>
+        <div class="map-frame">
+            <div id="map" role="region" aria-label="Map of reported tick sightings"></div>
+            <p class="map-legend" aria-label="Map marker legend">
+                <span>Marker key:</span>
+                <span class="legend-item">
+                    <span class="legend-marker recent" aria-hidden="true"></span>
+                    Recent (last 30 days)
+                </span>
+                <span class="legend-item">
+                    <span class="legend-marker older" aria-hidden="true"></span>
+                    Older report
+                </span>
+                <span>Cluster counts show nearby reports; zoom in to explore them.</span>
+            </p>
+        </div>
+
+        <section id="sightingsSection" class="content-panel" aria-labelledby="sightingsHeading">
+            <h2 id="sightingsHeading">Tick sightings and locations</h2>
+            <p>The list reflects the sightings matching the filters above.</p>
+            <details class="sightings-list">
+                <summary>Show sightings (<span id="sightingRowCount">0</span>)</summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <caption class="visually-hidden">Tick sightings, their reported locations, dates, and coordinates</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Species</th>
+                                <th scope="col">Location</th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Coordinates</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sightingTableBody"></tbody>
+                    </table>
+                </div>
+            </details>
+        </section>
+
+        <section id="insightsSection" class="content-panel" aria-labelledby="insightsHeading">
+            <h2 id="insightsHeading">Tick activity insights</h2>
+            <div class="insights-grid">
+                <div>
+                    <h3>Monthly tick sightings</h3>
+                    <p id="totalSightingsSummary">Total tick sightings: <strong id="totalSightingCount">0</strong></p>
+                    <div id="seasonalChart" class="chart" role="img"
+                         aria-label="Tick sightings by month"></div>
+                    <h3>Tick species by month</h3>
+                    <div id="speciesMonthBreakdown" class="species-month-breakdown"
+                         aria-label="Tick sighting counts for each species by month"></div>
+                </div>
+                <div>
+                    <h3>Sightings by region</h3>
+                    <details class="region-dropdown">
+                        <summary>Show sightings by region</summary>
+                        <ul id="regionList"></ul>
+                    </details>
+                </div>
+            </div>
+            <p id="insightsStatus"></p>
+        </section>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script>
+        if (!window.location.hash) {
+            document.getElementById("map").scrollIntoView({ block: "start" });
+        }
+
+        const themeToggle = document.getElementById("themeToggle");
+        let darkTheme = false;
+        try {
+            darkTheme = localStorage.getItem("tickTrackerTheme") === "dark";
+        } catch (error) {
+            document.getElementById("status").textContent =
+                "Theme preference could not be loaded; using the light theme.";
+        }
+
+        function applyTheme() {
+            document.documentElement.dataset.theme = darkTheme ? "dark" : "light";
+            themeToggle.textContent = darkTheme ? "Light theme" : "Dark theme";
+            themeToggle.setAttribute("aria-pressed", String(darkTheme));
+            themeToggle.setAttribute(
+                "aria-label",
+                `Switch to ${darkTheme ? "light" : "dark"} theme`
+            );
+        }
+
+        applyTheme();
+        themeToggle.addEventListener("click", () => {
+            darkTheme = !darkTheme;
+            applyTheme();
+            try {
+                localStorage.setItem("tickTrackerTheme", darkTheme ? "dark" : "light");
+            } catch (error) {
+                document.getElementById("status").textContent =
+                    "Theme changed, but this browser could not save your preference.";
+            }
+        });
+
+        const sharedParams = new URLSearchParams(window.location.search);
+        const sharedLat = Number(sharedParams.get("lat"));
+        const sharedLng = Number(sharedParams.get("lng"));
+        const hasSharedLocation =
+            sharedParams.has("lat") &&
+            sharedParams.has("lng") &&
+            Number.isFinite(sharedLat) &&
+            Number.isFinite(sharedLng) &&
+            sharedLat >= -90 && sharedLat <= 90 &&
+            sharedLng >= -180 && sharedLng <= 180;
+        const map = L.map("map").setView(
+            hasSharedLocation ? [sharedLat, sharedLng] : [54.5, -3.5],
+            hasSharedLocation ? 12 : 6
+        );
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(map);
+
+        let markers = [];
+        const markerCluster = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+        }).addTo(map);
+        const sightingCountControl = L.control({ position: "topright" });
+        sightingCountControl.onAdd = () => {
+            const container = L.DomUtil.create(
+                "div",
+                "leaflet-control-sighting-count"
+            );
+            container.setAttribute("aria-label", "Sightings shown on the map");
+            container.textContent = "Sightings: 0";
+            return container;
+        };
+        sightingCountControl.addTo(map);
+        let initialMapViewSet = hasSharedLocation;
+
+        function getFilterParams() {
+            const params = new URLSearchParams();
+            const filters = {
+                location: "locationFilter",
+                species: "speciesFilter",
+                from: "fromFilter",
+                to: "toFilter",
+            };
+
+            Object.entries(filters).forEach(([parameter, elementId]) => {
+                const value = document.getElementById(elementId).value.trim();
+                if (value) {
+                    params.set(parameter, value);
+                }
+            });
+            return params;
+        }
+
+        function escapeHtml(value) {
+            return String(value || "").replace(/[&<>"']/g, character => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;",
+            })[character]);
+        }
+
+        const commonSpeciesNames = {
+            "Ixodes ricinus": "Sheep tick",
+            "Ixodes hexagonus": "Hedgehog tick",
+            "Dermacentor reticulatus": "Ornate cow tick",
+            "Unknown": "Unknown species",
+        };
+
+        function speciesLabel(species) {
+            const commonName = commonSpeciesNames[species];
+            return commonName ? `${commonName} (${species})` : species || "Unknown species";
+        }
+
+        function renderSightingsList(sightings) {
+            const tableBody = document.getElementById("sightingTableBody");
+            const rowCount = document.getElementById("sightingRowCount");
+            tableBody.replaceChildren();
+            rowCount.textContent = sightings.length;
+
+            if (!sightings.length) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.colSpan = 4;
+                cell.textContent = "No sightings match these filters.";
+                row.append(cell);
+                tableBody.append(row);
+                return;
+            }
+
+            sightings.forEach(sighting => {
+                const row = document.createElement("tr");
+                const values = [
+                    speciesLabel(sighting.species),
+                    sighting.location || "Unknown",
+                    new Date(sighting.sighting_at).toLocaleString(),
+                    `${Number(sighting.latitude).toFixed(4)}, ${Number(sighting.longitude).toFixed(4)}`,
+                ];
+                values.forEach(value => {
+                    const cell = document.createElement("td");
+                    cell.textContent = value;
+                    row.append(cell);
+                });
+                tableBody.append(row);
+            });
+        }
+
+        async function loadSightings() {
+            const response = await fetch(`/api/sightings/?${getFilterParams()}`);
+
+            if (!response.ok) {
+                throw new Error("Could not load sightings");
+            }
+
+            const sightings = await response.json();
+            renderSightingsList(sightings);
+            const countElement = document.querySelector(
+                ".leaflet-control-sighting-count"
+            );
+            countElement.textContent =
+                `Sightings: ${sightings.length}`;
+
+            markerCluster.clearLayers();
+            markers = [];
+
+            sightings.forEach(sighting => {
+                const sightingDate = new Date(sighting.sighting_at);
+                const recent = (Date.now() - sightingDate.getTime()) / 86400000 <= 30;
+                const marker = L.marker(
+                    [sighting.latitude, sighting.longitude],
+                    {
+                        title: `${recent ? "Recent" : "Older"} tick sighting: ${sighting.species || "Unknown species"} at ${sighting.location || "unknown location"}`,
+                        alt: `${recent ? "Recent circular" : "Older diamond-shaped"} tick sighting marker`,
+                        icon: L.divIcon({
+                            className: "sighting-marker-icon",
+                            html: `<span class="sighting-pin ${recent ? "recent" : "older"}" aria-hidden="true"></span>`,
+                            iconSize: [24, 24],
+                            iconAnchor: [12, 12],
+                        }),
+                    }
+                ).addTo(markerCluster);
+                marker.sightingId = sighting.id;
+
+                const directionsUrl =
+                    `https://www.google.com/maps/dir/?api=1&destination=` +
+                    `${sighting.latitude},${sighting.longitude}`;
+                const image = sighting.image_url
+                    ? `<br><img src="${escapeHtml(sighting.image_url)}" alt="Sighting photo" style="max-width:220px;max-height:160px">`
+                    : "";
+                marker.bindPopup(`
+                    <strong>${escapeHtml(sighting.species || "Unknown species")}</strong><br>
+                    Location: ${escapeHtml(sighting.location || "Unknown")}<br>
+                    Date: ${escapeHtml(new Date(sighting.sighting_at).toLocaleString())}<br>
+                    Description: ${escapeHtml(sighting.description || "None provided")}
+                    ${image}<br>
+                    <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer">Get directions</a>
+                    <button type="button" class="share-sighting"
+                        data-lat="${sighting.latitude}" data-lng="${sighting.longitude}">
+                        Share
+                    </button>
+                `);
+
+                markers.push(marker);
+            });
+
+            if (hasSharedLocation) {
+                const sharedMarker = markers.find(marker => {
+                    const point = marker.getLatLng();
+                    return Math.abs(point.lat - sharedLat) < 0.000001 &&
+                        Math.abs(point.lng - sharedLng) < 0.000001;
+                });
+                if (sharedMarker) {
+                    markerCluster.zoomToShowLayer(
+                        sharedMarker,
+                        () => sharedMarker.openPopup()
+                    );
+                }
+            } else if (!initialMapViewSet && markers.length) {
+                map.fitBounds(markerCluster.getBounds(), {
+                    padding: [20, 20],
+                    maxZoom: 6,
+                });
+                initialMapViewSet = true;
+            }
+
+            document.getElementById("status").textContent =
+                "Map and sightings list updated.";
+        }
+
+        const monthNames = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
+
+        async function loadInsights() {
+            const params = getFilterParams();
+            params.set("interval", "monthly");
+            const response = await fetch(`/api/insights/?${params}`);
+            if (!response.ok) {
+                throw new Error("Could not load sighting insights");
+            }
+
+            const insights = await response.json();
+            document.getElementById("totalSightingCount").textContent =
+                insights.total_count;
+            const counts = new Map(
+                insights.seasonality.map(item => [item.month, item.count])
+            );
+            const maxCount = Math.max(1, ...counts.values());
+            const chart = document.getElementById("seasonalChart");
+            chart.replaceChildren();
+            chart.setAttribute(
+                "aria-label",
+                `Sightings by month: ${monthNames.map(
+                    (month, index) => `${month} ${counts.get(index + 1) || 0}`
+                ).join(", ")}`
+            );
+
+            monthNames.forEach((month, index) => {
+                const count = counts.get(index + 1) || 0;
+                const column = document.createElement("div");
+                column.className = "chart-column";
+                const value = document.createElement("span");
+                value.textContent = count;
+                const bar = document.createElement("div");
+                bar.className = "chart-bar";
+                bar.style.height = `${Math.max(2, (count / maxCount) * 145)}px`;
+                bar.setAttribute("aria-hidden", "true");
+                const label = document.createElement("span");
+                label.textContent = month;
+                column.append(value, bar, label);
+                chart.append(column);
+            });
+
+            const speciesBreakdown =
+                document.getElementById("speciesMonthBreakdown");
+            speciesBreakdown.replaceChildren();
+
+            const speciesCounts = new Map();
+            insights.species_by_month.forEach(item => {
+                if (!speciesCounts.has(item.species)) {
+                    speciesCounts.set(item.species, Array(12).fill(0));
+                }
+                speciesCounts.get(item.species)[item.month - 1] = item.count;
+            });
+
+            [...speciesCounts.entries()]
+                .sort(([left], [right]) => left.localeCompare(right))
+                .forEach(([species, monthlyCounts]) => {
+                    const card = document.createElement("section");
+                    card.className = "species-month-card";
+                    const heading = document.createElement("h4");
+                    heading.textContent = speciesLabel(species);
+                    card.append(heading);
+
+                    const monthGrid = document.createElement("div");
+                    monthGrid.className = "species-month-grid";
+                    monthGrid.setAttribute("role", "list");
+                    monthGrid.setAttribute(
+                        "aria-label",
+                        `${speciesLabel(species)} sightings by month`
+                    );
+                    monthlyCounts.forEach((count, index) => {
+                        const cell = document.createElement("div");
+                        cell.className = "species-month-cell";
+                        cell.setAttribute("role", "listitem");
+                        const month = document.createElement("span");
+                        month.textContent = monthNames[index];
+                        const value = document.createElement("strong");
+                        value.textContent = count;
+                        cell.append(month, value);
+                        monthGrid.append(cell);
+                    });
+
+                    const total = document.createElement("p");
+                    total.className = "species-month-total";
+                    total.textContent = `Total: ${monthlyCounts.reduce(
+                        (total, count) => total + count,
+                        0
+                    )}`;
+                    card.append(monthGrid, total);
+                    speciesBreakdown.append(card);
+                });
+
+            if (!speciesCounts.size) {
+                const empty = document.createElement("p");
+                empty.textContent = "No sightings match these filters.";
+                speciesBreakdown.append(empty);
+            }
+
+            const regionList = document.getElementById("regionList");
+            regionList.replaceChildren();
+            if (!insights.regions.length) {
+                const empty = document.createElement("li");
+                empty.textContent = "No sightings match these filters.";
+                regionList.append(empty);
+            } else {
+                insights.regions.forEach(region => {
+                    const item = document.createElement("li");
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.dataset.location = region.location;
+                    button.textContent = `${region.location}: ${region.count}`;
+                    button.setAttribute(
+                        "aria-label",
+                        `Show ${region.count} sightings from ${region.location}`
+                    );
+                    item.append(button);
+                    regionList.append(item);
+                });
+            }
+            document.getElementById("insightsStatus").textContent =
+                `Showing ${insights.trends.length} ${params.get("interval")} trend period(s).`;
+        }
+
+        function localDateTimeValue(date) {
+            const pad = value => String(value).padStart(2, "0");
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+                `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
+
+        function localDateValue(date) {
+            return localDateTimeValue(date).slice(0, 10);
+        }
+
+        const fromFilter = document.getElementById("fromFilter");
+        const toFilter = document.getElementById("toFilter");
+        const today = localDateValue(new Date());
+        fromFilter.max = today;
+        toFilter.max = today;
+
+        function validateDateFilters() {
+            fromFilter.setCustomValidity("");
+            toFilter.setCustomValidity("");
+            if (fromFilter.value && fromFilter.value > today) {
+                fromFilter.setCustomValidity("The start date cannot be in the future.");
+                fromFilter.reportValidity();
+                document.getElementById("status").textContent =
+                    "The start date cannot be in the future.";
+                return false;
+            }
+            if (toFilter.value && toFilter.value > today) {
+                toFilter.setCustomValidity("The end date cannot be in the future.");
+                toFilter.reportValidity();
+                document.getElementById("status").textContent =
+                    "The end date cannot be in the future.";
+                return false;
+            }
+            if (fromFilter.value && toFilter.value && fromFilter.value > toFilter.value) {
+                toFilter.setCustomValidity("End date must be on or after start date.");
+                toFilter.reportValidity();
+                document.getElementById("status").textContent =
+                    "The end date must be on or after the start date.";
+                return false;
+            }
+            return true;
+        }
+
+        async function applyFilters() {
+            if (!validateDateFilters()) {
+                return;
+            }
+
+            try {
+                await Promise.all([loadSightings(), loadInsights()]);
+            } catch (error) {
+                document.getElementById("status").textContent = error.message;
+                document.getElementById("insightsStatus").textContent = error.message;
+            }
+        }
+
+        document
+            .getElementById("filterButton")
+            .addEventListener("click", applyFilters);
+
+        document.getElementById("regionList").addEventListener("click", event => {
+            const button = event.target.closest("button[data-location]");
+            if (!button) {
+                return;
+            }
+            document.getElementById("locationFilter").value =
+                button.dataset.location;
+            document.getElementById("filters").scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+            applyFilters();
+        });
+
+        document
+            .getElementById("resetButton")
+            .addEventListener("click", () => {
+                document.getElementById("locationFilter").value = "";
+                document.getElementById("speciesFilter").value = "";
+                document.getElementById("fromFilter").value = "";
+                document.getElementById("toFilter").value = "";
+                applyFilters();
+            });
+
+        applyFilters();
+
+        document.addEventListener("click", async event => {
+            const button = event.target.closest(".share-sighting");
+            if (!button) {
+                return;
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.set("lat", button.dataset.lat);
+            url.searchParams.set("lng", button.dataset.lng);
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title: "Tick sighting", url: url.href });
+                } else {
+                    await navigator.clipboard.writeText(url.href);
+                    document.getElementById("status").textContent =
+                        "Sighting link copied to clipboard.";
+                }
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    document.getElementById("status").textContent =
+                        "Could not share this sighting.";
+                }
+            }
+        });
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("reportForm");
+            const latitudeInput = form.elements.latitude;
+            const longitudeInput = form.elements.longitude;
+            const locationInput = form.elements.location;
+            const locateButton = document.getElementById("locateCoordinates");
+            form.elements.sighting_at.max = localDateTimeValue(new Date());
+            let reportMarker = null;
+            let geocodeRequestId = 0;
+            let lastGeocodeStartedAt = 0;
+
+            async function fillLocationFromCoordinates(point) {
+                const requestId = ++geocodeRequestId;
+                locationInput.value = "";
+                document.getElementById("reportStatus").textContent =
+                    "Finding the place name from OpenStreetMap...";
+
+                const wait = Math.max(
+                    0,
+                    lastGeocodeStartedAt + 1100 - Date.now()
+                );
+                if (wait) {
+                    await new Promise(resolve => setTimeout(resolve, wait));
+                }
+                if (requestId !== geocodeRequestId) {
+                    return;
+                }
+
+                lastGeocodeStartedAt = Date.now();
+                const query = new URLSearchParams({
+                    format: "jsonv2",
+                    lat: point.lat,
+                    lon: point.lng,
+                    zoom: "10",
+                    addressdetails: "1",
+                });
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?${query}`,
+                        { headers: { "Accept-Language": "en" } }
+                    );
+                    if (!response.ok) {
+                        throw new Error("Place lookup is currently unavailable.");
+                    }
+                    const result = await response.json();
+                    if (requestId !== geocodeRequestId) {
+                        return;
+                    }
+                    const address = result.address || {};
+                    const placeName =
+                        address.city ||
+                        address.town ||
+                        address.village ||
+                        address.municipality ||
+                        address.hamlet ||
+                        address.county ||
+                        address.state ||
+                        result.name ||
+                        "";
+                    locationInput.value = String(
+                        placeName || result.display_name || ""
+                    ).slice(0, 200);
+                    document.getElementById("reportStatus").textContent =
+                        locationInput.value
+                            ? `Location set to ${locationInput.value}.`
+                            : "No place name was found; enter a location manually.";
+                    document.getElementById("status").textContent =
+                        "Location lookup complete.";
+                } catch (error) {
+                    if (requestId === geocodeRequestId) {
+                        document.getElementById("reportStatus").textContent =
+                            `${error.message} Enter the location manually if needed.`;
+                        document.getElementById("status").textContent =
+                            "Could not look up the location. You can enter it manually.";
+                    }
+                }
+            }
+
+            function setReportMarker(point, lookupLocation = false, focusMap = false) {
+                latitudeInput.value = point.lat.toFixed(6);
+                longitudeInput.value = point.lng.toFixed(6);
+
+                if (!reportMarker) {
+                    reportMarker = L.marker(point, {
+                        draggable: true,
+                        title: "Selected report location",
+                        alt: "Selected location for the new tick sighting",
+                        zIndexOffset: 1000,
+                    }).addTo(map);
+                    reportMarker.on("dragend", () => {
+                        const movedPoint = reportMarker.getLatLng();
+                        setReportMarker(movedPoint, true);
+                    });
+                } else {
+                    reportMarker.setLatLng(point);
+                }
+
+                if (focusMap) {
+                    map.setView(point, Math.max(map.getZoom(), 12));
+                }
+                if (lookupLocation) {
+                    fillLocationFromCoordinates(point);
+                }
+            }
+
+            map.on("click", event => {
+                setReportMarker(event.latlng, true);
+                document.getElementById("reportStatus").textContent =
+                    "Map location selected; looking up its place name.";
+            });
+
+            function readCoordinateInputs() {
+                if (
+                    !latitudeInput.value ||
+                    !longitudeInput.value ||
+                    !latitudeInput.checkValidity() ||
+                    !longitudeInput.checkValidity()
+                ) {
+                    latitudeInput.reportValidity();
+                    longitudeInput.reportValidity();
+                    document.getElementById("status").textContent =
+                        "Enter valid latitude and longitude coordinates.";
+                    return null;
+                }
+                return {
+                    lat: Number(latitudeInput.value),
+                    lng: Number(longitudeInput.value),
+                };
+            }
+
+            [latitudeInput, longitudeInput].forEach(input => {
+                input.addEventListener("change", () => {
+                    const point = readCoordinateInputs();
+                    if (point) {
+                        setReportMarker(point);
+                    }
+                });
+            });
+
+            locateButton.addEventListener("click", () => {
+                const point = readCoordinateInputs();
+                if (!point) {
+                    return;
+                }
+                setReportMarker(point, false, true);
+                fillLocationFromCoordinates(point);
+            });
+
+            document
+                .getElementById("reportForm")
+                .addEventListener("submit", async (event) => {
+                    event.preventDefault();
+                    const status = document.getElementById("reportStatus");
+                    const submitButton = form.querySelector('button[type="submit"]');
+
+                    const sightingDateInput = form.elements.sighting_at;
+                    sightingDateInput.setCustomValidity("");
+                    if (
+                        !sightingDateInput.value ||
+                        new Date(sightingDateInput.value) > new Date()
+                    ) {
+                        sightingDateInput.setCustomValidity(
+                            "Sighting date cannot be in the future."
+                        );
+                        sightingDateInput.reportValidity();
+                        document.getElementById("status").textContent =
+                            "Sighting date cannot be in the future.";
+                        return;
+                    }
+                    submitButton.disabled = true;
+
+                    try {
+                        const formData = new FormData(form);
+                        const selectedSpecies = form.elements.species.value;
+                        if (selectedSpecies === "other") {
+                            formData.set(
+                                "species",
+                                form.elements.other_species.value.trim()
+                            );
+                        }
+
+                        const response = await fetch("/api/sightings/", {
+                            method: "POST",
+                            body: formData,
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(
+                                Object.values(data).flat().join(" ")
+                            );
+                        }
+
+                        const speciesFilter = document.getElementById("speciesFilter");
+                        if (
+                            data.species &&
+                            !Array.from(speciesFilter.options).some(
+                                option => option.value === data.species
+                            )
+                        ) {
+                            const option = document.createElement("option");
+                            option.value = data.species;
+                            option.textContent = speciesLabel(data.species);
+                            speciesFilter.append(option);
+                        }
+
+                        status.textContent = "Sighting submitted successfully.";
+                        form.reset();
+                        document.getElementById("locationFilter").value = "";
+                        document.getElementById("speciesFilter").value = "";
+                        document.getElementById("fromFilter").value = "";
+                        document.getElementById("toFilter").value = "";
+                        try {
+                            await Promise.all([loadSightings(), loadInsights()]);
+                            map.setView(
+                                [data.latitude, data.longitude],
+                                Math.max(map.getZoom(), 10)
+                            );
+                            const submittedMarker = markers.find(
+                                marker => marker.sightingId === data.id
+                            );
+                            if (submittedMarker) {
+                                submittedMarker.openPopup();
+                            }
+                        } catch (error) {
+                            status.textContent =
+                                `Sighting saved, but the map could not refresh: ${error.message}`;
+                        }
+                    } catch (error) {
+                        status.textContent = `Submission failed: ${error.message}`;
+                    } finally {
+                        submitButton.disabled = false;
+                    }
+                });
+
+            const speciesSelect = document.getElementById("speciesSelect");
+            const otherSpecies = document.getElementById("otherSpecies");
+            const updateOtherSpecies = () => {
+                const isOther = speciesSelect.value === "other";
+                otherSpecies.hidden = !isOther;
+                otherSpecies.disabled = !isOther;
+                otherSpecies.required = isOther;
+                if (!isOther) {
+                    otherSpecies.value = "";
+                }
+            };
+            speciesSelect.addEventListener("change", updateOtherSpecies);
+            document
+                .getElementById("reportForm")
+                .addEventListener("reset", () => setTimeout(() => {
+                    updateOtherSpecies();
+                    if (reportMarker) {
+                        map.removeLayer(reportMarker);
+                        reportMarker = null;
+                    }
+                }));
+        });
+    </script>
+
+    <section id="reportSection" class="content-panel report-panel">
+        <h2>Report a tick sighting</h2>
+
+        <form id="reportForm" enctype="multipart/form-data">
+            <label>
+                Date and time
+                <input id="sightingDate" name="sighting_at" type="datetime-local" required>
+            </label>
+
+            <label>
+                Species
+                <select id="speciesSelect" name="species" required>
+                    <option value="">Choose a species</option>
+                    <option value="Ixodes ricinus">Sheep tick (Ixodes ricinus)</option>
+                    <option value="Ixodes hexagonus">Hedgehog tick (Ixodes hexagonus)</option>
+                    <option value="Dermacentor reticulatus">Ornate cow tick (Dermacentor reticulatus)</option>
+                    <option value="Fox Tick">Fox Tick (guide example)</option>
+                    <option value="Costal Red">Costal Red (guide example)</option>
+                    <option value="other">Other</option>
+                </select>
+                <input
+                    id="otherSpecies"
+                    name="other_species"
+                    type="text"
+                    placeholder="Enter the species"
+                    aria-label="Other tick species"
+                    hidden
+                    disabled
+                >
+            </label>
+
+            <label>
+                Latitude
+                <input id="reportLatitude" name="latitude" type="number" step="any" min="-90" max="90" required>
+            </label>
+
+            <label>
+                Longitude
+                <input id="reportLongitude" name="longitude" type="number" step="any" min="-180" max="180" required>
+            </label>
+
+            <p class="coordinate-help">
+                Click the map or drag the report marker to choose a location. You can also enter coordinates and look up the place name using OpenStreetMap.
+            </p>
+            <button id="locateCoordinates" type="button">Find location from coordinates</button>
+
+            <label>
+                Location
+                <input id="reportLocation" name="location" required>
+            </label>
+
+            <label>
+                Description
+                <textarea name="description"></textarea>
+            </label>
+
+            <label>
+                Image
+                <input name="image" type="file" accept="image/*">
+            </label>
+
+            <button type="submit">Submit sighting</button>
+        </form>
+        <p id="reportStatus"></p>
+    </section>
+
+    <section id="tickGuide" class="content-panel" aria-labelledby="tickGuideHeading">
+        <h2 id="tickGuideHeading">Tick identification and bite prevention</h2>
+        <div class="education-grid">
+            <article>
+                <h3>Identifying ticks</h3>
+                <p>
+                    Ticks are small arachnids with eight legs as adults. In the UK,
+                    the sheep tick (Ixodes ricinus) is widespread; the hedgehog tick
+                    (Ixodes hexagonus) and ornate cow tick (Dermacentor reticulatus)
+                    also occur. Size and appearance vary by life stage and whether a
+                    tick has fed, so a photo or app cannot reliably confirm a species.
+                    Ask a veterinary professional about a tick found on a pet.
+                </p>
+                <details class="tick-guide">
+                    <summary>Open tick photo guide (5 examples)</summary>
+                    <div class="tick-guide-content">
+                        <p>
+                            These supplied photographs are visual examples, not a
+                            diagnostic key. Appearance can change with life stage,
+                            sex, and feeding; seek expert advice if identification matters.
+                        </p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Tick name</th>
+                                    <th scope="col">Example photo</th>
+                                    <th scope="col">Visible features in this example</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Sheep Tick</th>
+                                    <td>
+                                        <figure>
+                                            <img src="{% static 'sightings/ticks/sheep-tick.png' %}"
+                                                 alt="Sheep Tick example, viewed from above, with a dark shield and reddish-brown body">
+                                            <figcaption>Image supplied for this guide.</figcaption>
+                                        </figure>
+                                    </td>
+                                    <td>A dark shield near the head contrasts with a reddish-brown oval body.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Hedgehog Tick</th>
+                                    <td>
+                                        <figure>
+                                            <img src="{% static 'sightings/ticks/hedgehog-tick.png' %}"
+                                                 alt="Hedgehog Tick example, viewed from above, with a dark front shield and pale oval body">
+                                            <figcaption>Image supplied for this guide.</figcaption>
+                                        </figure>
+                                    </td>
+                                    <td>A dark reddish front shield contrasts with a broad, pale grey body in this example.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Ornate Cow Tick</th>
+                                    <td>
+                                        <figure>
+                                            <img src="{% static 'sightings/ticks/ornate-cow-tick.png' %}"
+                                                 alt="Ornate Cow Tick example, viewed from above, with pale mottled markings on its shield">
+                                            <figcaption>Image supplied for this guide.</figcaption>
+                                        </figure>
+                                    </td>
+                                    <td>Distinct pale, mottled markings are visible across the shield and upper body.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Fox Tick</th>
+                                    <td>
+                                        <figure>
+                                            <img src="{% static 'sightings/ticks/fox-tick.png' %}"
+                                                 alt="Fox Tick example, viewed from above, with a dark brown oval body">
+                                            <figcaption>Image supplied for this guide.</figcaption>
+                                        </figure>
+                                    </td>
+                                    <td>A dark brown, elongated oval body with a relatively uniform appearance in this example.</td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Costal Red</th>
+                                    <td>
+                                        <figure>
+                                            <img src="{% static 'sightings/ticks/costal-red-tick.png' %}"
+                                                 alt="Costal Red tick example, viewed from above, with a dark body and reddish legs">
+                                            <figcaption>Image supplied for this guide.</figcaption>
+                                        </figure>
+                                    </td>
+                                    <td>A dark body with lighter reddish-brown legs is visible in this example.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            </article>
+            <article>
+                <h3>Reducing tick bites</h3>
+                <ul>
+                    <li>Use a veterinary-recommended tick preventive for pets and follow its label.</li>
+                    <li>After walks, check people, pets, and clothing, especially around the head, neck, and skin folds.</li>
+                    <li>Remove an attached tick promptly with a proper tick-removal tool; avoid squeezing or burning it.</li>
+                    <li>Contact a healthcare or veterinary professional if you are concerned after a bite.</li>
+                    <li>If a tick bite is followed by a rash, fever, joint pain, or flu-like symptoms, contact a 
+                        healthcare professional promptly and ask about possible Lyme disease risk.</li>
+                </ul>
+                <p>Tick sightings are community reports and do not indicate confirmed disease risk.</p>
+                <h3>Further information can be found at</h3>
+                <p>
+                    <a href="https://www.rspca.org.uk/adviceandwelfare/pets/general/ticks"
+                       target="_blank" rel="noopener noreferrer">
+                        RSPCA: Ticks
+                    </a>
+                </p>
+                <h3>Tick treatment options</h3>
+                <p>
+                    <a href="https://mypetandi.elanco.com/en_gb/our-products?issues=Ticks"
+                       target="_blank" rel="noopener noreferrer">
+                        Explore Elanco tick products
+                    </a>
+                    . Ask your veterinary professional which option is right for your pet.
+                </p>
+            </article>
+        </div>
+    </section>
+    </main>
+</body>
+</html>
